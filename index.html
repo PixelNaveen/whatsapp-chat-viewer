@@ -1,157 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WhatsApp Chat Viewer</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <style>
-      body {
-        background-color: #ece5dd;
-      }
-      .chat-container {
-        max-width: 800px;
-        margin: auto;
-        padding: 10px;
-      }
-      .chat-message {
-        display: flex;
-        flex-direction: column;
-        max-width: 75%;
-        padding: 10px;
-        border-radius: 10px;
-        margin-bottom: 8px;
-      }
-      .sent {
-        background-color: #dcf8c6;
-        align-self: flex-end;
-      }
-      .received {
-        background-color: #fff;
-        align-self: flex-start;
-      }
-      .chat-bubble {
-        word-wrap: break-word;
-      }
-      .chat-day {
-        text-align: center;
-        margin: 15px 0;
-        font-size: 0.85rem;
-        color: #555;
-      }
-      img,
-      video {
-        max-width: 100%;
-        border-radius: 8px;
-        margin-top: 5px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container py-3">
-      <h2 class="text-center mb-4">WhatsApp Chat Viewer</h2>
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <label class="form-label">1) Load chat .txt</label>
-          <input type="file" id="chatFile" class="form-control" accept=".txt" />
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label">2) Load media .zip</label>
-          <input type="file" id="zipFile" class="form-control" accept=".zip" />
-        </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatsApp Chat Viewer</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #ece5dd;
+    }
+    .chat-container {
+      max-width: 800px;
+      margin: auto;
+      padding: 10px;
+    }
+    .chat-message {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      position: relative;
+      min-width: 100px;
+    }
+    .sent {
+      background-color: #dcf8c6;
+      align-self: flex-end;
+    }
+    .received {
+      background-color: #fff;
+      align-self: flex-start;
+    }
+    .chat-bubble {
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .chat-day {
+      text-align: center;
+      margin: 15px 0;
+      font-size: 0.85rem;
+      color: #555;
+      background-color: #e5ddd5;
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    img, video {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 5px;
+    }
+    .time-label {
+      font-size: 0.7rem;
+      color: #555;
+      text-align: right;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-3">
+    <h2 class="text-center mb-4">WhatsApp Chat Viewer</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">1) Load chat .txt</label>
+        <input type="file" id="chatFile" class="form-control" accept=".txt" />
       </div>
-      <div id="chatOutput" class="chat-container d-flex flex-column mt-4"></div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">2) Load media .zip</label>
+        <input type="file" id="zipFile" class="form-control" accept=".zip" />
+      </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script>
-      let chatData = [];
-      let mediaFiles = {};
+    <div id="chatOutput" class="chat-container d-flex flex-column mt-4"></div>
+  </div>
 
-      function parseChat(text) {
-        const lines = text.split(/\r?\n/);
-        chatData = [];
-        for (let line of lines) {
-          const match = line.match(
-            /^\[(\d{4}-\d{2}-\d{2}),\s([0-9:]+\s[APM]{2})\]\s([^:]+):\s?(.*)$/u
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    let chatData = [];
+    let mediaFiles = {};
+
+    function parseChat(text) {
+      const lines = text.split(/\r?\n/);
+      chatData = [];
+
+      for (let line of lines) {
+        const match = line.match(/^\[(\d{4}-\d{2}-\d{2}),\s([\d:]+\s[APM]{2})\]\s([^:]+):\s?(.*)$/u);
+        if (match) {
+          let [_, datePart, timePart, sender, message] = match;
+          // Remove seconds from time
+          let shortTime = timePart.replace(/:\d{2}/,''); // hh:mm AM/PM
+          const date = `${datePart} ${shortTime}`;
+          chatData.push({ date, sender, message });
+        }
+      }
+      renderChat();
+    }
+
+    function renderChat() {
+      const container = document.getElementById("chatOutput");
+      container.innerHTML = "";
+      let lastDate = "";
+
+      chatData.forEach((msg) => {
+        const msgDateOnly = msg.date.split(" ")[0]; // YYYY-MM-DD
+        if (msgDateOnly !== lastDate) {
+          const dateDivider = document.createElement("div");
+          dateDivider.className = "chat-day mx-auto";
+          dateDivider.textContent = msgDateOnly;
+          container.appendChild(dateDivider);
+          lastDate = msgDateOnly;
+        }
+
+        const bubble = document.createElement("div");
+        bubble.className = `chat-message ${msg.sender.includes("Naveen") ? "sent ms-auto" : "received me-auto"}`;
+
+        const senderName = document.createElement("small");
+        senderName.className = "fw-bold mb-1";
+        senderName.textContent = msg.sender;
+        bubble.appendChild(senderName);
+
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "chat-bubble";
+        messageDiv.innerHTML = formatMessage(msg.message);
+        bubble.appendChild(messageDiv);
+
+        // Add WhatsApp-style time
+        const timeDiv = document.createElement("div");
+        timeDiv.className = "time-label";
+        const time = msg.date.split(" ")[1] + " " + msg.date.split(" ")[2]; // hh:mm AM/PM
+        timeDiv.textContent = time;
+        bubble.appendChild(timeDiv);
+
+        container.appendChild(bubble);
+      });
+    }
+
+    function formatMessage(msg) {
+      const attachMatch = msg.match(/<attached:\s*(.*?)>/);
+      if (attachMatch) {
+        const fileName = attachMatch[1].trim();
+        if (mediaFiles[fileName]) {
+          const ext = fileName.split(".").pop().toLowerCase();
+          if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+            return `<img src="${mediaFiles[fileName]}">`;
+          } else if (["mp4", "webm"].includes(ext)) {
+            return `<video controls src="${mediaFiles[fileName]}"></video>`;
+          } else {
+            return `<a href="${mediaFiles[fileName]}" download>${fileName}</a>`;
+          }
+        }
+        return `<span class="text-muted">${fileName} (missing)</span>`;
+      }
+      return msg;
+    }
+
+    document.getElementById("chatFile").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => parseChat(e.target.result);
+      reader.readAsText(file);
+    });
+
+    document.getElementById("zipFile").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      JSZip.loadAsync(file).then((zip) => {
+        const filePromises = [];
+        zip.forEach((relativePath, zipEntry) => {
+          filePromises.push(
+            zipEntry.async("base64").then((data) => {
+              const ext = zipEntry.name.split(".").pop().toLowerCase();
+              let mime = "application/octet-stream";
+              if (["jpg", "jpeg", "png", "webp"].includes(ext)) mime = `image/${ext === "jpg" ? "jpeg" : ext}`;
+              else if (["mp4"].includes(ext)) mime = "video/mp4";
+              else if (["webm"].includes(ext)) mime = "video/webm";
+              mediaFiles[zipEntry.name] = `data:${mime};base64,${data}`;
+            })
           );
-          if (match) {
-            let [_, datePart, timePart, sender, message] = match;
-            const date = `${datePart} ${timePart}`;
-            chatData.push({ date, sender, message });
-          }
-        }
-        renderChat();
-      }
-
-      function renderChat() {
-        const container = document.getElementById("chatOutput");
-        container.innerHTML = "";
-        chatData.forEach((msg) => {
-          const bubble = document.createElement("div");
-          bubble.className = `chat-message ${
-            msg.sender.includes("Naveen") ? "sent ms-auto" : "received me-auto"
-          }`;
-          bubble.innerHTML = `<div class="chat-bubble">${formatMessage(
-            msg.message
-          )}</div>`;
-          container.appendChild(bubble);
         });
-      }
-
-      function formatMessage(msg) {
-        const attachMatch = msg.match(/<attached:\s*(.*?)>/);
-        if (attachMatch) {
-          const fileName = attachMatch[1];
-          if (mediaFiles[fileName]) {
-            const ext = fileName.split(".").pop().toLowerCase();
-            if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
-              return `<img src="${mediaFiles[fileName]}">`;
-            } else if (["mp4", "webm"].includes(ext)) {
-              return `<video controls src="${mediaFiles[fileName]}"></video>`;
-            } else {
-              return `<a href="${mediaFiles[fileName]}" download>${fileName}</a>`;
-            }
-          }
-          return `<span class="text-muted">${fileName} (missing)</span>`;
-        }
-        return msg;
-      }
-
-      document.getElementById("chatFile").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => parseChat(e.target.result);
-        reader.readAsText(file);
+        Promise.all(filePromises).then(renderChat);
       });
-
-      document.getElementById("zipFile").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        JSZip.loadAsync(file).then((zip) => {
-          const filePromises = [];
-          zip.forEach((relativePath, zipEntry) => {
-            filePromises.push(
-              zipEntry.async("base64").then((data) => {
-                const ext = zipEntry.name.split(".").pop().toLowerCase();
-                const mime =
-                  ext === "mp4"
-                    ? "video/mp4"
-                    : ext === "webm"
-                    ? "video/webm"
-                    : ext === "webp"
-                    ? "image/webp"
-                    : "image/jpeg";
-                mediaFiles[zipEntry.name] = `data:${mime};base64,${data}`;
-              })
-            );
-          });
-          Promise.all(filePromises).then(renderChat);
-        });
-      });
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
